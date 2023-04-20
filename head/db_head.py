@@ -81,14 +81,27 @@ class DBHead(nn.Module):
         return torch.reciprocal(1 + torch.exp(-self.k * (x - y)))
 
     def forward(self, x: torch.Tensor):
+        """
+        DB 网络中，训练过程中网络有 3 个输出：概率图、阈值图和近似二值图：
+        概率图：图中每个像素点的值为该位置属于文本区域的概率。
+        阈值图：图中每个像素点的值为该位置的二值化阈值。
+        近似二值图：由概率图和阈值图通过 DB 算法计算得到，图中像素的值为 0 或 1。
+
+        在推理阶段为什么只用到 probility_map,这是因为
+        由于threshold map的存在，probability map的边界可以学习的很好，因此可以直接按照收缩的方式（Vatti clipping algorithm）扩张回去，
+        扩张公式为： A x r / L (其中A为面积,L为周长,r为扩张因子,经验值1.5) 
+        收缩公式 D = A x (1 - r^2) / L (其中A 为面积,L为周长,r为收缩因子，经验值为0.4)
+        """
         #收缩标签需要用到的map
-        #我们在后处理中使用收缩标签法来计算框
+        #我们在后处理中使用收缩标签法来计算框 mask_mean -> bbox_score!
+        # 概率图,每个像素点的值为该位置属于文本区域的概率
         shrink_maps = self.binarize(x)  # 让他自动学习二值化的参数
         if not self.training:
             return shrink_maps
-        #阈值图
+        #阈值图 途中每个像素点为该位置的二值化阈值,...
         threshold_maps = self.thresh(x)
         # db方法获取概率图 可微二值化
-        binary_maps = self.step_function(shrink_maps, threshold_maps)
+        #近似二值图 
+        binary_maps = self.step_function(shrink_maps, threshold_maps)1
         # 训练阶段输出三个预测图
         return torch.concat([shrink_maps, threshold_maps, binary_maps], dim=1)
