@@ -1,0 +1,1 @@
+real_world_text_images/street.png	[{"transcription": "忠表", "points": [[289, 116], [370, 109], [372, 154], [289, 162]], "difficult": false}, {"transcription": "丽会万年", "points": [[75, 187], [229, 183], [230, 234], [74, 244]], "difficult": false}, {"transcription": "EMPEROR", "points": [[47, 289], [263, 279], [259, 320], [43, 330]], "difficult": false}]
