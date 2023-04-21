@@ -23,8 +23,15 @@ class MakeShrinkMap(object):
     
 
     # 验证文本多边形的有效性
-    def validate_polygons(self,polygons,h,w):
+    def validate_polygons(self,polygons,ignore_tags:List[bool],h,w):
         if len(polygons) == 0:
-            return [],[]
+            return polygons,ignore_tags
+
+        # clip the polygon coordinates...
+        for indices,polygon in enumerate(polygons):
+            # 
+            
+            
+            
         
         
