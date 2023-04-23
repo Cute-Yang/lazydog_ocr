@@ -25,7 +25,8 @@ class HeadNet(nn.Module):
             in_channels=in_channels,
             out_channels=in_channels // 4,
             kernel_size=kernel_list[0],
-            padding=kernel_list[0] // 2
+            padding=kernel_list[0] // 2,
+            bias=False
         )
         self.conv_bn1 = nn.BatchNorm2d(
             num_features=in_channels // 4
@@ -97,11 +98,12 @@ class DBHead(nn.Module):
         # 概率图,每个像素点的值为该位置属于文本区域的概率
         shrink_maps = self.binarize(x)  # 让他自动学习二值化的参数
         if not self.training:
+            # 在推理模式下,直接返回收缩图，然后用去做后处理，使用opencv寻找矩形框
             return shrink_maps
         #阈值图 途中每个像素点为该位置的二值化阈值,...
         threshold_maps = self.thresh(x)
         # db方法获取概率图 可微二值化
         #近似二值图 
-        binary_maps = self.step_function(shrink_maps, threshold_maps)1
+        binary_maps = self.step_function(shrink_maps, threshold_maps)
         # 训练阶段输出三个预测图
         return torch.concat([shrink_maps, threshold_maps, binary_maps], dim=1)

@@ -35,7 +35,9 @@ class ConvBNLayer(nn.Module):
             kernel_size=kernel_size,
             stride=stride,
             padding=padding,
-            groups=groups
+            groups=groups,
+            # 一定要paddle框架的代码对应起来
+            bias=False
         )
         self.bn = nn.BatchNorm2d(num_features=out_channels)
 
@@ -252,7 +254,7 @@ class MobileNetV3(nn.Module):
         self.out_channels.append(make_divisible(scale * cls_ch_squeeze))
 
         for i, stage in enumerate(self.stages):
-            self.add_module("stage_{}".format(i), module=stage)
+            self.add_module("stage{}".format(i), module=stage)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.conv(x)

@@ -53,18 +53,19 @@ class SEModule(nn.Module):
 class RSELayer(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, kernel_size: int, shortcut: bool = True):
         super(RSELayer, self).__init__()
-        self.conv = nn.Conv2d(
+        self.in_conv = nn.Conv2d(
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=kernel_size,
-            padding=kernel_size//2
+            padding=kernel_size//2,
+            bias=False
         )
 
         self.se_block = SEModule(in_channels=out_channels, reduction=4)
         self.shortcut = shortcut
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        output = self.conv(x)
+        output = self.in_conv(x)
         if self.shortcut:
             output = output + self.se_block(output)
         else:
@@ -91,7 +92,7 @@ class RSEFPN(nn.Module):
                     in_channels=feature_map_channels_list[i],
                     out_channels=out_channels,
                     kernel_size=1,
-                    shortcut=True
+                    shortcut=shortcut
                 )
             )
 
@@ -100,7 +101,7 @@ class RSEFPN(nn.Module):
                     in_channels=out_channels,
                     out_channels=out_channels // 4,
                     kernel_size=3,
-                    shortcut=1
+                    shortcut=shortcut
                 )
             )
 
@@ -114,9 +115,11 @@ class RSEFPN(nn.Module):
         in5 = self.ins_conv[3](c5)
 
         # 然后进行2倍上采样并且相加
+        # 最好使用scale_factor参数来指定我们放大倍数
         out4 = in4 + F.upsample(in5, scale_factor=2, mode="nearest")
         out3 = in3 + F.upsample(out4, scale_factor=2, mode="nearest")
         out2 = in2 + F.upsample(out3, scale_factor=2, mode="nearest")
+        
 
         p2 = self.inp_conv[0](out2)
         p3 = self.inp_conv[1](out3)
@@ -128,4 +131,6 @@ class RSEFPN(nn.Module):
         p4 = F.upsample(p4, scale_factor=4, mode="nearest")
         p5 = F.upsample(p5, scale_factor=8, mode="nearest")
         # 沿着channel维度拼接
-        return torch.concat([p2, p3, p4, p5], dim=1)
+        output = torch.concat([p5,p4,p3,p2], dim=1)
+        print("torch neck output:",output)
+        return output
