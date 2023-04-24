@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import onnxruntime as ort
 import paddle
 import torch
 from numpy.typing import NDArray
@@ -42,6 +43,7 @@ def compute_resize_info(h:int,w:int,max_side_len:int=960):
         scale = max_side_len / max_side
     h = h * scale
     w = w * scale
+    # 因为fpn层要求我们的输入至少能够被下采样至 1 / 32,所以要求我们的大小必须是32k
     h = int(round(h / 32.0)) * 32
     w = int(round(w / 32.0)) * 32
     return h,w
@@ -96,12 +98,21 @@ def torch_inference(state_dict_path:str=None,image:NDArray=None):
         pred = db_net(input_tensor).numpy()
     return pred
 
+def onnx_inference(onnx_file:str=None,image:NDArray=None):
+    ort_session = ort.InferenceSession(onnx_file)
+    feed_dict = {
+        "image":image
+    }
+    output = ort_session.run([],input_feed=feed_dict)
+    return output[0]
+
 
 if __name__ == "__main__":
     image_path = "real_world_text_images/street.png"
     image = cv2.imread(image_path)
     processed_image = image_preprocess(image=image)
     # print(processed_image)
+    # 这个是小模型,其实还放出了一个比较大的基于Resnet50的模型
     paddel_state_dict = "models/ch_PP-OCRv3_det_distill_train/student.pdparams"
     paddel_result = paddel_infernece(
         state_dict_path=paddel_state_dict,
@@ -113,5 +124,24 @@ if __name__ == "__main__":
         image=processed_image
     )
 
+    onnx_file = "models/mobilenetV3_backbone_set_alpha_0.2_in_hardsigmoid_from_pytorch.onnx"
+    ort_result = onnx_inference(onnx_file=onnx_file,image=processed_image)
+
     print("paddle result:{}".format(paddel_result))
     print("torch result:{}".format(torch_result))
+    print("ort output:{}".format(ort_result))
+    print(np.sum(paddel_result))
+    print(np.sum(torch_result))
+    print(np.sum(ort_result))
+    s = np.squeeze(ort_result)
+    ort_image = cv2.imwrite("ort_image.png",(s * 255.0).astype(np.uint8))
+    s = np.squeeze(torch_result)
+    ort_image = cv2.imwrite("torch_image.png",(s * 255.0).astype(np.uint8))
+    s = np.squeeze(paddel_result)
+    ort_image = cv2.imwrite("paddel_image.png",(s * 255.0).astype(np.uint8))
+    
+    diff = np.sum(np.abs(torch_result - ort_result))
+    print("the diff between torch and ort is {}".format(diff))
+    diff2 = np.sum(np.abs(paddel_result - ort_result))
+    print("the diff between paddle and ort is {}".format(diff2))
+    print("export onnx ok...")

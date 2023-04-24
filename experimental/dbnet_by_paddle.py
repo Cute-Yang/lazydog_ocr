@@ -9,6 +9,9 @@ import paddle
 import paddle.nn.functional as F
 from paddle import ParamAttr, nn
 
+print_feature_map:bool=False
+print_neck_output:bool=True
+
 
 def make_divisible(v, divisor=8, min_value=None):
     if min_value is None:
@@ -157,7 +160,6 @@ class MobileNetV3(nn.Layer):
         for i, stage in enumerate(self.stages):
             self.add_sublayer(sublayer=stage, name="stage{}".format(i))
             # 只是为了能偶通过名字来访问
-            # 原理类似于构建一个map std::map<string,Module>,如果名字重复了,可能会报警告,然后直接覆盖
 
     def forward(self, x):
         x = self.conv(x)
@@ -165,6 +167,8 @@ class MobileNetV3(nn.Layer):
         for stage in self.stages:
             x = stage(x)
             out_list.append(x)
+        if print_feature_map:
+            print(out_list)
         return out_list
 
 
@@ -297,6 +301,7 @@ class SEModule(nn.Layer):
         # 这个的输出维度也是 n c 1 1
         outputs = self.conv2(outputs)
         outputs = F.hardsigmoid(outputs, slope=0.2, offset=0.5)
+        # outputs = F.hardsigmoid(outputs)
         return inputs * outputs
 
 
@@ -389,8 +394,8 @@ class RSEFPN(nn.Layer):
         p3 = F.upsample(p3, scale_factor=2, mode="nearest", align_mode=1)
         # 拼接起来,作为最后网络的输出特征向量
         fuse = paddle.concat([p5, p4, p3, p2], axis=1)
-        print("paddle neck output:", fuse)
-
+        if print_neck_output:
+            print("paddle neck output:", fuse)
         return fuse
 
 

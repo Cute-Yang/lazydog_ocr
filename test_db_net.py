@@ -35,19 +35,20 @@ if __name__ == "__main__":
     # print(backpone.out_channels)
     # 尝试导出一下这个结构看一下
     db_net = DBNet()
-    db_net.eval()
-    state_dict = db_net.state_dict()
-    torch_model_keys_save_file = "model_keys_compare/db_net_keys_torch.json"
-    with open(torch_model_keys_save_file, "w") as f:
-        f.write(
-            json.dumps(
-                {
-                    "keys": list(state_dict.keys())
-                }
-            )
-        )
+    state_dict = torch.load("models/db_net.pth")
+    # db_net.load_state_dict(state_dict)
+    # torch_model_keys_save_file = "model_keys_compare/db_net_keys_torch.json"
+    # with open(torch_model_keys_save_file, "w") as f:
+    #     f.write(
+    #         json.dumps(
+    #             {
+    #                 "keys": list(state_dict.keys())
+    #             }
+    #         )
+    #     )
     # save onnx
-    save_onnx_flag = False
+    save_onnx_flag = True
+    save_onnx_file = "db_net.onnx"
     if save_onnx_flag:
         db_net.eval()
         # print(db_net)
@@ -58,33 +59,33 @@ if __name__ == "__main__":
         assert h % 32 == 0, "the height must be divided by 32! for fpn net..."
         assert w % 32 == 0, "the width must be divided by 32! for fpn net"
         with torch.no_grad():
-            y = db_net(x)
-            print(y.shape)
-            print(y)
-        with torch.no_grad():
             torch.onnx.export(
                 model=db_net,
                 args=(x,),
-                f="db_net.onnx",
+                f=save_onnx_file,
                 export_params=True,
                 verbose=False,
                 input_names=["image"],
                 output_names=["shrink_map"],
                 dynamic_axes={
                     "image": {
-                        0: "batch_size"
+                        0: "batch_size",
+                        2: "image_height",
+                        3:"image_width"
                     },
                     "shrink_map": {
-                        0: "batch_size"
+                        0: "batch_size",
+                        2: "image_height",
+                        3: "image_width"
                     }
                 },
                 opset_version=11
             )
             y = db_net(x)
-            print(y)
+            print(y.numpy())
         try:
             import onnxruntime as ort
-            ort_session = ort.InferenceSession("db_net.onnx")
+            ort_session = ort.InferenceSession(save_onnx_file)
             feed_dict = {
                 "image": x.numpy()
             }

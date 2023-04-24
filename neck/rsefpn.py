@@ -13,6 +13,27 @@ from torch.nn import functional as F
 4.将上述的stage都上采样到1/4,放大倍数为1,2,4,8
 5.将上采样之后的几个stage沿着channel维度拼接，作为最后的输出
 """
+print_neck_output:bool=False
+
+
+class HardSigmoid(nn.Module):
+    def __init__(self, slope:float=1 / 6,offset:float=0.5,left_interval:float=-3.0,right_interval:float=3.0):
+        super(HardSigmoid, self).__init__()
+        self.slope = slope
+        self.offset = offset
+        self.left_interval = left_interval
+        self.right_interval = right_interval
+    
+    #这里的导出的计算图很冗余,我们这里需要自定义导出的onnx算子
+    def forward(self, x):
+        left_mask = (x <= self.left_interval)
+        right_mask = (x >= self.right_interval)
+        otherwise = (x > self.left_interval) & (x < self.right_interval)
+        output = x.clone()
+        output[left_mask] = 0.0
+        output[right_mask] = 1.0
+        output[otherwise] = x[otherwise] * self.slope + self.offset
+        return output
 
 
 class SEModule(nn.Module):
@@ -32,7 +53,7 @@ class SEModule(nn.Module):
             stride=1,
             padding=0
         )
-
+    
         self.conv2 = nn.Conv2d(
             in_channels=in_channels // reduction,
             out_channels=in_channels,
@@ -40,12 +61,14 @@ class SEModule(nn.Module):
             stride=1,
             padding=0
         )
-
+    
+    
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         output = self.avg_pool(x)
         output = self.conv1(output)
         output = F.relu(output)
         output = self.conv2(output)
+        # 算了,onnx支持自定义的slope和offset,我们在这里修改对应的属性值就行了
         output = F.hardsigmoid(output)
         return x * output
 
@@ -132,5 +155,6 @@ class RSEFPN(nn.Module):
         p5 = F.upsample(p5, scale_factor=8, mode="nearest")
         # 沿着channel维度拼接
         output = torch.concat([p5,p4,p3,p2], dim=1)
-        print("torch neck output:",output)
+        if print_neck_output:
+            print("torch neck output:",output)
         return output

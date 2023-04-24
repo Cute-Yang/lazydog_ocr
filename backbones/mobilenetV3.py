@@ -8,6 +8,7 @@ from torch.nn import functional as F
 # if the divisor % 2 == 0,if the v % divisor >= divisor // 2,then equal ceil function,else equal floor function
 # if the divisor % 2 == 1,if the v % divisor > divisor // 2, then equal ceil function,else equal floor function
 
+print_feature_map:bool = False
 
 def make_divisible(v: int, divisor: int = 8, min_value: int = 8):
     new_v = max(min_value, int((v + divisor // 2)) // divisor * divisor)
@@ -262,6 +263,8 @@ class MobileNetV3(nn.Module):
         for stage in self.stages:
             x = stage(x)
             out_list.append(x)
+        if print_feature_map:
+            print(out_list)
         return out_list
     
     def get_feature_map_channels_list(self):
